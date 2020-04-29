@@ -39,7 +39,7 @@ merged_local_branches=( $(git branch --no-color --merged master | grep -v -E '(\
 # Now comes the more challenging... building a list of Squash and Merged branches
 #
 
-while read branch; do
+while read -r branch; do
   if [[ "${merged_local_branches[*]}" =~ ${branch} ]]; then
     #echo "DEBUG: Already found: skipping ${branch}"
     continue
