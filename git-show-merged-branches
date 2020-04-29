@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+#
+# Copyright (c) 2020 Dan Kalowsky <dank@deadmime.org>.  All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+#
 
 #set -xv
 
