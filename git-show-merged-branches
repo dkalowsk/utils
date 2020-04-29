@@ -40,18 +40,18 @@ merged_local_branches=( $(git branch --no-color --merged master | grep -v -E '(\
 #
 
 while read branch; do
-  if [[ "${merged_local_branches[@]}" =~ "${branch}" ]]; then
+  if [[ "${merged_local_branches[@]}" =~ ${branch} ]]; then
     #echo "DEBUG: Already found: skipping ${branch}"
     continue
   fi
-  merge_base=$(git merge-base origin/master -- ${branch})
+  merge_base=$(git merge-base origin/master -- "${branch}")
 
-  tree=$(git rev-parse ${branch}^{tree})
+  tree=$(git rev-parse "${branch}"^{tree})
   # okay now create a temporary squash commit
-  dangling_commit=$(git commit-tree ${tree} -p ${merge_base} -m _)
+  dangling_commit=$(git commit-tree "${tree}" -p "${merge_base}" -m _)
   # now check if the dangling commit has been squashed to master
   # this works because the next commit should be based upon the predictable history of master
-  if [[ $(git cherry origin/master ${dangling_commit}) == "-"* ]]; then
+  if [[ $(git cherry origin/master "${dangling_commit}") == "-"* ]]; then
     merged_local_branches=( "${branch}" "${merged_local_branches[@]}" )
     #echo "DEBUG: found squashed branch ${branch}"
   fi
@@ -63,6 +63,6 @@ done < <(git branch --no-color | grep -v -E '(\*|master*|release*)' | cut -f2 -d
 for branch in "${merged_local_branches[@]}"; do
   echo "${action} : ${branch}"
   if [ "${action}" == "Deleting" ]; then
-      git branch -D -- ${branch} &>/dev/null
+      git branch -D -- "${branch}" &>/dev/null
   fi
 done
