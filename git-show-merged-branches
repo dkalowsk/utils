@@ -40,7 +40,7 @@ merged_local_branches=( $(git branch --no-color --merged master | grep -v -E '(\
 #
 
 while read branch; do
-  if [[ "${merged_local_branches[@]}" =~ ${branch} ]]; then
+  if [[ "${merged_local_branches[*]}" =~ ${branch} ]]; then
     #echo "DEBUG: Already found: skipping ${branch}"
     continue
   fi
