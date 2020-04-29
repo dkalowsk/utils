@@ -52,7 +52,7 @@ while read branch; do
   # now check if the dangling commit has been squashed to master
   # this works because the next commit should be based upon the predictable history of master
   if [[ $(git cherry origin/master ${dangling_commit}) == "-"* ]]; then
-    merged_local_branches=("${merged_local_branches[@]}" "$branch")
+    merged_local_branches=( "${branch}" "${merged_local_branches[@]}" )
     #echo "DEBUG: found squashed branch ${branch}"
   fi
 done < <(git branch --no-color | grep -v -E '(\*|master*|release*)' | cut -f2 -d $'\t')
