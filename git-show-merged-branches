@@ -60,7 +60,7 @@ done < <(git branch --no-color | grep -v -E '(\*|master*|release*)' | cut -f2 -d
 #
 # Now that we have our list, let's go display it and clean it out if so desired
 #
-for branch in ${merged_local_branches}; do
+for branch in "${merged_local_branches[@]}"; do
   echo "${action} : ${branch}"
   if [ "${action}" == "Deleting" ]; then
       git branch -D -- ${branch} &>/dev/null
