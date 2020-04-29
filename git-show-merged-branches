@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+#set -xv
+
+function _display_help {
+  echo ""
+  echo "==============================================================================="
+  echo "Show locally merged branches:                                                  "
+  echo -e "\tThis command takes one additional argument to automatically delete the    "
+  echo -e "\tmerged branches for you.  By default the command will skip the master,    "
+  echo -e "\trelease, and the currently selected branches.                             "
+  echo "                                                                               "
+  echo "Options:                                                                       "
+  echo -e "\t-d Adding -d will automatically remove branches discovered to be merged.  "
+  echo -e "\t   This will skip the master and release branches.                        "
+  echo "==============================================================================="
+  echo ""
+}
+
+action="Merged"
+
+if [ "$#" -eq 1 ]; then
+  if [ "$1" == "-h" ]; then
+    _display_help
+    exit 0
+  fi
+
+  if [ "$1" == "-d" ]; then
+    action="Deleting"
+  fi
+fi
+
+#
+# Build the list of traditionally merged branches
+#
+merged_local_branches=( $(git branch --no-color --merged master | grep -v -E '(\*|master*|release*)' | cut -f2 -d $'\t') )
+
+#
+# Now comes the more challenging... building a list of Squash and Merged branches
+#
+
+while read branch; do
+  if [[ "${merged_local_branches[@]}" =~ "${branch}" ]]; then
+    #echo "DEBUG: Already found: skipping ${branch}"
+    continue
+  fi
+  merge_base=$(git merge-base origin/master -- ${branch})
+
+  tree=$(git rev-parse ${branch}^{tree})
+  # okay now create a temporary squash commit
+  dangling_commit=$(git commit-tree ${tree} -p ${merge_base} -m _)
+  # now check if the dangling commit has been squashed to master
+  # this works because the next commit should be based upon the predictable history of master
+  if [[ $(git cherry origin/master ${dangling_commit}) == "-"* ]]; then
+    merged_local_branches=("${merged_local_branches[@]}" "$branch")
+    #echo "DEBUG: found squashed branch ${branch}"
+  fi
+done < <(git branch --no-color | grep -v -E '(\*|master*|release*)' | cut -f2 -d $'\t')
+
+#
+# Now that we have our list, let's go display it and clean it out if so desired
+#
+for branch in ${merged_local_branches}; do
+  echo "${action} : ${branch}"
+  if [ "${action}" == "Deleting" ]; then
+      git branch -D -- ${branch} &>/dev/null
+  fi
+done
