@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+curl -s -w "\n" https://icanhazdadjoke.com/
+
+# Give them a chance to see the joke
+sleep 2
+
+# Now pass it along to the correct function
+git add "$@"
