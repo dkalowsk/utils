@@ -12,17 +12,23 @@ function _display_help {
   echo "==============================================================================="
   echo "Show locally merged branches:                                                  "
   echo -e "\tThis command takes one additional argument to automatically delete the    "
-  echo -e "\tmerged branches for you.  By default the command will skip the master,    "
-  echo -e "\trelease, and the currently selected branches.                             "
+  echo -e "\tmerged branches for you.  By default the command will skip the default    "
+  echo -e "\tbranch, release, and the currently selected branches.                     "
   echo "                                                                               "
   echo "Options:                                                                       "
   echo -e "\t-d Adding -d will automatically remove branches discovered to be merged.  "
-  echo -e "\t   This will skip the master and release branches.                        "
+  echo -e "\t   This will skip the default and release branches.                       "
   echo "==============================================================================="
   echo ""
 }
 
 action="Merged"
+
+#
+# It isn't a good practice to just assume the default branch is named master.  Use git to tell
+# what is the default branch in use for that specific repo, and use that value instead.
+#
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
 
 if [ "$#" -eq 1 ]; then
   if [ "$1" == "-h" ]; then
@@ -38,7 +44,7 @@ fi
 #
 # Build the list of traditionally merged branches
 #
-merged_local_branches=( $(git branch --no-color --merged master | grep -v -E '(\*|master*|release*)' | cut -f2 -d $'\t') )
+merged_local_branches=( $(git branch --no-color --merged ${DEFAULT_BRANCH} | grep -v -E '(\*|${DEFAULT_BRANCH}*|release*)' | cut -f2 -d $'\t' ) )
 
 #
 # Now comes the more challenging... building a list of Squash and Merged branches
@@ -49,18 +55,18 @@ while read -r branch; do
     #echo "DEBUG: Already found: skipping ${branch}"
     continue
   fi
-  merge_base=$(git merge-base origin/master -- "${branch}")
+  merge_base=$(git merge-base origin/${DEFAULT_BRANCH} -- "${branch}")
 
   tree=$(git rev-parse "${branch}"^{tree})
   # okay now create a temporary squash commit
   dangling_commit=$(git commit-tree "${tree}" -p "${merge_base}" -m _)
   # now check if the dangling commit has been squashed to master
   # this works because the next commit should be based upon the predictable history of master
-  if [[ $(git cherry origin/master "${dangling_commit}") == "-"* ]]; then
+  if [[ $(git cherry origin/${DEFAULT_BRANCH} "${dangling_commit}") == "-"* ]]; then
     merged_local_branches=( "${branch}" "${merged_local_branches[@]}" )
     #echo "DEBUG: found squashed branch ${branch}"
   fi
-done < <(git branch --no-color | grep -v -E '(\*|master*|release*)' | cut -f2 -d $'\t')
+done < <(git branch --no-color | grep -v -E '(\*|${DEFAULT_BRANCH}*|release*)' | cut -f2 -d $'\t')
 
 #
 # Now that we have our list, let's go display it and clean it out if so desired
