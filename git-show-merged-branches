@@ -5,8 +5,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
-#set -xv
-
 function _display_help {
   echo ""
   echo "==============================================================================="
@@ -20,6 +18,52 @@ function _display_help {
   echo -e "\t   This will skip the default and release branches.                       "
   echo "==============================================================================="
   echo ""
+}
+
+function _old_merge_check() {
+  #
+  # Now comes the more challenging... building a list of Squash and Merged branches
+  # This seems to fail when the branch is rebased on the GitLab and GitHub service
+  # and then merged in.
+  #
+  local merge_base=
+  local dangling_commit=
+
+  while read -r branch; do
+    if [[ "${merged_local_branches[*]}" =~ ${branch} ]]; then
+      #echo "DEBUG: Already found: skipping ${branch}"
+      continue
+    fi
+    merge_base=$(git merge-base "origin/${DEFAULT_BRANCH}" -- "${branch}")
+
+    tree=$(git rev-parse "${branch}"^{tree})
+    # okay now create a temporary squash commit
+    dangling_commit=$(git commit-tree "${tree}" -p "${merge_base}" -m _)
+    # now check if the dangling commit has been squashed to master
+    # this works because the next commit should be based upon the predictable history of master
+    if [[ $(git cherry "origin/${DEFAULT_BRANCH}" "${dangling_commit}") == "-"* ]]; then
+      merged_local_branches=( "${branch}" "${merged_local_branches[@]}" )
+      #echo "DEBUG: found squashed branch ${branch}"
+    fi
+  done < <(git branch --no-color | grep -v -E "(\*|${DEFAULT_BRANCH}*|release*)" | cut -f2 -d $'\t')
+
+}
+
+function _new_merge_check() {
+  #
+  # This seems to work better for branches that have been rebased on GitLab
+  # or GitHub and then merged in.  Not sure if it is completely correct yet.
+  #
+  while read -r branch; do
+    if [[ "${merged_local_branches[*]}" =~ ${branch} ]]; then
+      #echo "DEBUG: Already found: skipping ${branch}"
+      continue
+    fi
+    git merge-base --is-ancestor "${branch}" origin/"${DEFAULT_BRANCH}"
+    if [ "$?" -eq 0 ]; then
+      merged_local_branches=( "${branch}" "${merged_local_branches[@]}" )
+    fi
+  done < <(git branch --no-color | grep -v -E "(\*|${DEFAULT_BRANCH}*|release*)" | cut -f2 -d $'\t')
 }
 
 action="Merged"
@@ -39,34 +83,20 @@ if [ "$#" -eq 1 ]; then
   if [ "$1" == "-d" ]; then
     action="Deleting"
   fi
+
+  if [ "$1" == "-x" ]; then
+    set -o xtrace
+    export PS4='+ ${BASH_SOURCE:-}:${FUNCNAME[0]:-}:L${LINENO:-}:   '
+  fi
 fi
 
 #
 # Build the list of traditionally merged branches
 #
-merged_local_branches=( $(git branch --no-color --merged ${DEFAULT_BRANCH} | grep -v -E '(\*|${DEFAULT_BRANCH}*|release*)' | cut -f2 -d $'\t' ) )
+merged_local_branches=( $(git branch --no-color --merged ${DEFAULT_BRANCH} | grep -v -E "(\*|${DEFAULT_BRANCH}*|release*)" | cut -f2 -d $'\t' ) )
 
-#
-# Now comes the more challenging... building a list of Squash and Merged branches
-#
-
-while read -r branch; do
-  if [[ "${merged_local_branches[*]}" =~ ${branch} ]]; then
-    #echo "DEBUG: Already found: skipping ${branch}"
-    continue
-  fi
-  merge_base=$(git merge-base origin/${DEFAULT_BRANCH} -- "${branch}")
-
-  tree=$(git rev-parse "${branch}"^{tree})
-  # okay now create a temporary squash commit
-  dangling_commit=$(git commit-tree "${tree}" -p "${merge_base}" -m _)
-  # now check if the dangling commit has been squashed to master
-  # this works because the next commit should be based upon the predictable history of master
-  if [[ $(git cherry origin/${DEFAULT_BRANCH} "${dangling_commit}") == "-"* ]]; then
-    merged_local_branches=( "${branch}" "${merged_local_branches[@]}" )
-    #echo "DEBUG: found squashed branch ${branch}"
-  fi
-done < <(git branch --no-color | grep -v -E '(\*|${DEFAULT_BRANCH}*|release*)' | cut -f2 -d $'\t')
+#_old_merge_check
+_new_merge_check
 
 #
 # Now that we have our list, let's go display it and clean it out if so desired
