@@ -30,7 +30,9 @@ start_branch=
 
 function _do_update {
   local branch_name="${1}"
+  local stop_recursion="false"
   local parent_branch=
+
   parent_branch=$(git rev-parse --abbrev-ref --symbolic-full-name @{u})
 
   #
@@ -38,7 +40,15 @@ function _do_update {
   # origin of everything, usually called master
   #
   if [ -n "${branch_name}" ]; then
+    if [[ "${branch_name}" = "${REPO_REMOTE}/"* ]]; then
+      stop_recursion="true"
+    fi
+
     if [ "${branch_name}" != "${DEFAULT_BRANCH}" ]; then
+       stop_recursion="true"
+    fi
+
+    if [ "${stop_recursion}" != "true" ]; then
       git checkout "${parent_branch}"
       _do_update "${parent_branch}"
       git checkout "${branch_name}"
