@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+
+
+function _display_help {
+  echo ""
+  echo "==============================================================================="
+  echo "Atomic branch update tool:"
+  echo -e "\tThis command assists in maintaining a series of branches that are used to"
+  echo -e "\tenforce an atomic commit behavior at the PR level.  It assumes the each"
+  echo -e "\tbranch properly declares a dependency on another branch until it reaches"
+  echo -e "\tthe branch master."
+  echo ""
+  echo -e "Example update:"
+  echo -e "\tcurrent branch is: jdoe0001/issue_401_fix_layer"
+  echo -e "\t% git atomic-update"
+  echo -e "\tThis will walk down the parent branches until it reaches master at which point"
+  echo -e "\tit begins to update the branches to include all changes back to the parent."
+  echo ""
+  echo -e "\tEach branch contains a single commit work item, and may contain CR corrections."
+  echo -e "\tLive Simply."
+  echo "==============================================================================="
+  echo ""
+}
+
+REPO_REMOTE="$(git remote)"
+DEFAULT_BRANCH=$(git remote show ${REPO_REMOTE} | awk '/HEAD branch/ {print $NF}')
+
+start_branch=
+
+function _do_update {
+  local branch_name="${1}"
+  local parent_branch=
+  parent_branch=$(git rev-parse --abbrev-ref --symbolic-full-name @{u})
+
+  #
+  # Recursively call down to build a stack up until we reach the
+  # origin of everything, usually called master
+  #
+  if [ -n "${branch_name}" ]; then
+    if [ "${branch_name}" != "${DEFAULT_BRANCH}" ]; then
+      git checkout "${parent_branch}"
+      _do_update "${parent_branch}"
+      git checkout "${branch_name}"
+    fi
+  fi
+
+  git pull --prune --rebase || exit $?
+}
+
+if ! start_branch=$(git symbolic-ref --short -q HEAD)
+then
+    echo "Currently not on a branch, this script can only work on an active branch"
+    exit 1
+fi
+
+_do_update "${start_branch}"
+
