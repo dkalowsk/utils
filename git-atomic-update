@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-
-
 function _display_help {
   echo ""
   echo "==============================================================================="
@@ -24,7 +22,7 @@ function _display_help {
 }
 
 REPO_REMOTE="$(git remote)"
-DEFAULT_BRANCH=$(git remote show ${REPO_REMOTE} | awk '/HEAD branch/ {print $NF}')
+DEFAULT_BRANCH=$(git remote show "${REPO_REMOTE}" | awk '/HEAD branch/ {print $NF}')
 
 start_branch=
 
@@ -40,11 +38,11 @@ function _do_update {
   # origin of everything, usually called master
   #
   if [ -n "${branch_name}" ]; then
-    if [[ "${branch_name}" = "${REPO_REMOTE}/"* ]]; then
+    if [[ "${parent_branch}" = "${REPO_REMOTE}/"* ]]; then
       stop_recursion="true"
     fi
 
-    if [ "${branch_name}" != "${DEFAULT_BRANCH}" ]; then
+    if [ "${branch_name}" = "${DEFAULT_BRANCH}" ]; then
        stop_recursion="true"
     fi
 
