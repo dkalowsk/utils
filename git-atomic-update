@@ -7,16 +7,20 @@ function _display_help {
   echo -e "\tThis command assists in maintaining a series of branches that are used to"
   echo -e "\tenforce an atomic commit behavior at the PR level.  It assumes the each"
   echo -e "\tbranch properly declares a dependency on another branch until it reaches"
-  echo -e "\tthe branch master."
+  echo -e "\tthe branch origin."
   echo ""
   echo -e "Example update:"
   echo -e "\tcurrent branch is: jdoe0001/issue_401_fix_layer"
-  echo -e "\t% git atomic-update"
+  echo -e "\t$ git atomic-update"
   echo -e "\tThis will walk down the parent branches until it reaches master at which point"
   echo -e "\tit begins to update the branches to include all changes back to the parent."
   echo ""
   echo -e "\tEach branch contains a single commit work item, and may contain CR corrections."
   echo -e "\tLive Simply."
+  echo ""
+  echo -e "Optional flags:"
+  echo -e "\t--push\tPublish local commits found on each branch visited"
+  echo -e "\t-h\tDisplay this menu"
   echo "==============================================================================="
   echo ""
 }
@@ -25,6 +29,7 @@ REPO_REMOTE="$(git remote)"
 DEFAULT_BRANCH=$(git remote show "${REPO_REMOTE}" | awk '/HEAD branch/ {print $NF}')
 
 start_branch=
+branch_prefix=
 
 function _do_update {
   local branch_name="${1}"
@@ -35,7 +40,7 @@ function _do_update {
 
   #
   # Recursively call down to build a stack up until we reach the
-  # origin of everything, usually called master
+  # origin of everything
   #
   if [ -n "${branch_name}" ]; then
     if [[ "${parent_branch}" = "${REPO_REMOTE}/"* ]]; then
@@ -43,7 +48,7 @@ function _do_update {
     fi
 
     if [ "${branch_name}" = "${DEFAULT_BRANCH}" ]; then
-       stop_recursion="true"
+      stop_recursion="true"
     fi
 
     if [ "${stop_recursion}" != "true" ]; then
@@ -53,14 +58,34 @@ function _do_update {
     fi
   fi
 
-  git pull --prune --rebase || exit $?
+  git pull --prune --rebase || exit #?
+  if [ -n "${branch_prefix}" ] && [ "$(git rev-list --count ${parent_branch}..HEAD)" -ne 0 ]; then
+    git push "${REPO_REMOTE}" "${branch_name}:${branch_prefix}${branch_name}" --force-with-lease || exit $?
+  fi
 }
+
+if [ -n "${1}" ]; then
+  case "${1}" in
+    --push)
+      if ! branch_prefix=$(git config --get user.email)
+      then
+        echo "Global git user.email is not set. Local commits will not be published"
+        branch_prefix=
+        break
+      fi
+      branch_prefix="$(echo ${branch_prefix} | awk -F"@" '{print $1}')/"
+      ;;
+    *)
+    _display_help
+    exit
+    ;;
+    esac
+fi
 
 if ! start_branch=$(git symbolic-ref --short -q HEAD)
 then
-    echo "Currently not on a branch, this script can only work on an active branch"
-    exit 1
+  echo "Currently not on a branch, this script can only work on an active branch"
+  exit 1
 fi
 
 _do_update "${start_branch}"
-
